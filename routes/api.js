@@ -55,7 +55,7 @@ router.get('/logs', async (req, res) => {
     }
 });
 
-// 4. NEW: Search Logs (Database Search)
+// 4. Search Logs (Database Search)
 router.get('/logs/search', async (req, res) => {
     try {
         const query = req.query.q;
@@ -72,7 +72,7 @@ router.get('/logs/search', async (req, res) => {
     }
 });
 
-// 5. NEW: Update (Edit a Trip)
+// 5. Update (Edit a Trip)
 router.post('/update', async (req, res) => {
     try {
         const { id, notes } = req.body;
@@ -89,6 +89,16 @@ router.post('/delete', async (req, res) => {
     try {
         await Trip.findByIdAndDelete(req.body.id);
         res.json({ message: 'Deleted' });
+    } catch (err) {
+        res.status(500).send(err);
+    }
+});
+
+// 7. Clear All Logs
+router.post('/clear', async (req, res) => {
+    try {
+        await Trip.deleteMany({}); // Deletes everything in the collection
+        res.json({ message: 'All logs cleared!' });
     } catch (err) {
         res.status(500).send(err);
     }

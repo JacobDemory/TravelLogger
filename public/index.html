@@ -13,6 +13,7 @@
         <header>
             <h1>Traveler's Log</h1>
             <p>Check the weather and log your journey.</p>
+            <button onclick="toggleUnits()" id="unitBtn">Switch to °F</button>
         </header>
 
         <form onsubmit="searchCity(event)" class="search-box">
@@ -40,7 +41,10 @@
 
         <hr>
 
-        <h2>My Travel History</h2>
+        <div class="history-header">
+            <h2>My Travel History</h2>
+            <button class="clear-all-btn" onclick="clearAllLogs()">Clear History</button>
+        </div>
         
         <form onsubmit="searchLogs(event)" class="search-box">
             <input type="text" id="dbSearchInput" placeholder="Search your logs...">
@@ -53,6 +57,7 @@
 
     <script>
         let currentData = null;
+        let isCelsius = true; // State for units
 
         function getWeatherDescription(code) {
             const codes = {
@@ -63,9 +68,28 @@
             return codes[code] || 'Varied Weather';
         }
 
-        // Search Weather (API)
+        // --- UNIT CONVERSION LOGIC ---
+        function toggleUnits() {
+            isCelsius = !isCelsius;
+            document.getElementById('unitBtn').innerText = isCelsius ? "Switch to °F" : "Switch to °C";
+            
+            // Update displayed search result if it exists
+            if (currentData) {
+                updateDisplayTemp();
+            }
+            // Reload logs to update their units too
+            loadLogs();
+        }
+
+        function formatTemp(celsius) {
+            if (isCelsius) return `${celsius}°C`;
+            const f = (celsius * 9/5) + 32;
+            return `${f.toFixed(1)}°F`;
+        }
+        // -----------------------------
+
         async function searchCity(event) {
-            event.preventDefault(); // Prevent page reload (FORM requirement standard)
+            event.preventDefault(); 
             const city = document.getElementById('cityInput').value;
             
             const res = await fetch(`/api/weather/${city}`);
@@ -76,42 +100,43 @@
                 return;
             }
 
-            // Reset Edit Mode if it was active
             cancelEdit();
-
             currentData = data;
             
             document.getElementById('resCity').innerText = `${data.name}, ${data.country}`;
-            document.getElementById('resTemp').innerText = `${data.temperature}°C`;
             document.getElementById('resDesc').innerText = getWeatherDescription(data.weathercode);
+            updateDisplayTemp();
             
             document.getElementById('result').classList.remove('hidden');
             document.getElementById('msg').innerText = '';
         }
 
-        // Save or Update Trip
+        function updateDisplayTemp() {
+            if(currentData) {
+                document.getElementById('resTemp').innerText = formatTemp(currentData.temperature);
+            }
+        }
+
         async function saveTrip() {
             const notes = document.getElementById('logNotes').value;
             const editId = document.getElementById('editId').value;
             const msg = document.getElementById('msg');
 
-            // IF EDIT ID EXISTS, WE ARE UPDATING
             if (editId) {
-                const res = await fetch('/api/update', {
+                await fetch('/api/update', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id: editId, notes: notes })
                 });
                 msg.innerText = "Trip updated successfully!";
-                cancelEdit(); // Exit edit mode
-            } 
-            // ELSE WE ARE CREATING NEW
-            else {
+                cancelEdit(); 
+            } else {
                 if (!currentData) return;
+                // Always save to DB in Celsius for consistency
                 const payload = {
                     city: currentData.name,
                     country: currentData.country,
-                    temperature: currentData.temperature,
+                    temperature: currentData.temperature, 
                     condition: getWeatherDescription(currentData.weathercode),
                     notes: notes
                 };
@@ -125,11 +150,9 @@
                 msg.innerText = data.message;
                 document.getElementById('logNotes').value = ''; 
             }
-            
-            loadLogs(); // Refresh list
+            loadLogs(); 
         }
 
-        // Search Database Logs
         async function searchLogs(event) {
             event.preventDefault();
             const query = document.getElementById('dbSearchInput').value;
@@ -144,21 +167,33 @@
             renderLogs(data);
         }
 
+        // NEW: Clear All Function
+        async function clearAllLogs() {
+            if(!confirm("Are you sure you want to delete your ENTIRE travel history? This cannot be undone.")) return;
+            
+            await fetch('/api/clear', { method: 'POST' });
+            loadLogs(); // Grid should be empty now
+        }
+
         function renderLogs(data) {
             const grid = document.getElementById('logsGrid');
             grid.innerHTML = '';
 
+            if(data.length === 0) {
+                grid.innerHTML = '<p>No trips logged yet.</p>';
+                return;
+            }
+
             data.forEach(trip => {
                 const div = document.createElement('div');
                 div.className = 'log-card';
-                // Pass safe strings to onclick
                 const safeNotes = trip.notes.replace(/'/g, "\\'"); 
                 const safeCity = trip.city.replace(/'/g, "\\'");
 
                 div.innerHTML = `
                     <div class="log-header">
                         <strong>${trip.city}, ${trip.country}</strong>
-                        <span>${trip.temperature}°C</span>
+                        <span>${formatTemp(trip.temperature)}</span>
                     </div>
                     <small>${trip.condition}</small>
                     <p class="notes">"${trip.notes}"</p>
@@ -172,21 +207,16 @@
         }
 
         function startEdit(id, city, notes) {
-            // Scroll to top
             window.scrollTo(0, 0);
-            
-            // Show result box even if hidden
             document.getElementById('result').classList.remove('hidden');
             
-            // Populate fields
             document.getElementById('resCity').innerText = `Editing: ${city}`;
-            document.getElementById('resTemp').innerText = '--'; // Hide temp during edit
+            document.getElementById('resTemp').innerText = ''; 
             document.getElementById('logNotes').value = notes;
             document.getElementById('editId').value = id;
 
-            // Change Button State
             document.getElementById('saveBtn').innerText = "Update Trip";
-            document.getElementById('saveBtn').style.backgroundColor = "#ffa726"; // Orange for edit
+            document.getElementById('saveBtn').style.backgroundColor = "#ffa726"; 
             document.getElementById('cancelBtn').classList.remove('hidden');
             document.getElementById('msg').innerText = "Edit Mode Active";
         }
@@ -195,22 +225,20 @@
             document.getElementById('editId').value = '';
             document.getElementById('logNotes').value = '';
             document.getElementById('saveBtn').innerText = "Log This Trip";
-            document.getElementById('saveBtn').style.backgroundColor = "#00bcd4"; // Back to blue
+            document.getElementById('saveBtn').style.backgroundColor = "#00bcd4"; 
             document.getElementById('cancelBtn').classList.add('hidden');
             document.getElementById('msg').innerText = "";
             
-            // If we weren't viewing a city, hide the box again
             if(!currentData) {
                 document.getElementById('result').classList.add('hidden');
             } else {
-                // Restore current search view
                 document.getElementById('resCity').innerText = `${currentData.name}, ${currentData.country}`;
-                document.getElementById('resTemp').innerText = `${currentData.temperature}°C`;
+                updateDisplayTemp();
             }
         }
 
         async function deleteLog(id) {
-            if(!confirm("Are you sure?")) return;
+            if(!confirm("Delete this trip?")) return;
             await fetch('/api/delete', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -219,7 +247,6 @@
             loadLogs();
         }
 
-        // Load on start
         loadLogs();
     </script>
 </body>
