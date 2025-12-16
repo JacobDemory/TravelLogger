@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<meta charset="UTF-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Traveler's Log</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,10 +15,10 @@
             <p>Check the weather and log your journey.</p>
         </header>
 
-        <div class="search-box">
-            <input type="text" id="cityInput" placeholder="Enter City (e.g. London)">
-            <button onclick="searchCity()">Get Weather</button>
-        </div>
+        <form onsubmit="searchCity(event)" class="search-box">
+            <input type="text" id="cityInput" placeholder="Enter City (e.g. London)" required>
+            <button type="submit">Get Weather</button>
+        </form>
 
         <div id="result" class="card hidden">
             <h2 id="resCity">City Name</h2>
@@ -28,8 +28,12 @@
             </div>
             
             <div class="log-form">
+                <input type="hidden" id="editId">
                 <textarea id="logNotes" placeholder="Write a memory about this place..."></textarea>
-                <button id="saveBtn" onclick="saveTrip()">Log This Trip</button>
+                <div class="btn-group">
+                    <button id="saveBtn" onclick="saveTrip()">Log This Trip</button>
+                    <button id="cancelBtn" class="hidden cancel-btn" onclick="cancelEdit()">Cancel Edit</button>
+                </div>
             </div>
             <p id="msg" class="success-msg"></p>
         </div>
@@ -37,14 +41,19 @@
         <hr>
 
         <h2>My Travel History</h2>
-        <button class="refresh-btn" onclick="loadLogs()">Refresh History</button>
+        
+        <form onsubmit="searchLogs(event)" class="search-box">
+            <input type="text" id="dbSearchInput" placeholder="Search your logs...">
+            <button type="submit">Search Logs</button>
+        </form>
+        
+        <button class="refresh-btn" onclick="loadLogs()">Show All</button>
         <div id="logsGrid" class="grid"></div>
     </div>
 
     <script>
         let currentData = null;
 
-        // Open-Meteo returns codes. We map them to text manually.
         function getWeatherDescription(code) {
             const codes = {
                 0: 'Clear Sky', 1: 'Mainly Clear', 2: 'Partly Cloudy', 3: 'Overcast',
@@ -54,10 +63,11 @@
             return codes[code] || 'Varied Weather';
         }
 
-        async function searchCity() {
+        // Search Weather (API)
+        async function searchCity(event) {
+            event.preventDefault(); // Prevent page reload (FORM requirement standard)
             const city = document.getElementById('cityInput').value;
-            if(!city) return alert("Please enter a city");
-
+            
             const res = await fetch(`/api/weather/${city}`);
             const data = await res.json();
 
@@ -66,10 +76,11 @@
                 return;
             }
 
-            // Save data to global var so we can use it in saveTrip()
+            // Reset Edit Mode if it was active
+            cancelEdit();
+
             currentData = data;
             
-            // Update UI
             document.getElementById('resCity').innerText = `${data.name}, ${data.country}`;
             document.getElementById('resTemp').innerText = `${data.temperature}°C`;
             document.getElementById('resDesc').innerText = getWeatherDescription(data.weathercode);
@@ -78,39 +89,72 @@
             document.getElementById('msg').innerText = '';
         }
 
+        // Save or Update Trip
         async function saveTrip() {
-            if (!currentData) return;
             const notes = document.getElementById('logNotes').value;
+            const editId = document.getElementById('editId').value;
+            const msg = document.getElementById('msg');
+
+            // IF EDIT ID EXISTS, WE ARE UPDATING
+            if (editId) {
+                const res = await fetch('/api/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: editId, notes: notes })
+                });
+                msg.innerText = "Trip updated successfully!";
+                cancelEdit(); // Exit edit mode
+            } 
+            // ELSE WE ARE CREATING NEW
+            else {
+                if (!currentData) return;
+                const payload = {
+                    city: currentData.name,
+                    country: currentData.country,
+                    temperature: currentData.temperature,
+                    condition: getWeatherDescription(currentData.weathercode),
+                    notes: notes
+                };
+
+                const res = await fetch('/api/log', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                msg.innerText = data.message;
+                document.getElementById('logNotes').value = ''; 
+            }
             
-            const payload = {
-                city: currentData.name,
-                country: currentData.country,
-                temperature: currentData.temperature,
-                condition: getWeatherDescription(currentData.weathercode),
-                notes: notes
-            };
-
-            const res = await fetch('/api/log', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            const responseData = await res.json();
-            document.getElementById('msg').innerText = responseData.message;
-            document.getElementById('logNotes').value = ''; // Clear text area
             loadLogs(); // Refresh list
+        }
+
+        // Search Database Logs
+        async function searchLogs(event) {
+            event.preventDefault();
+            const query = document.getElementById('dbSearchInput').value;
+            const res = await fetch(`/api/logs/search?q=${query}`);
+            const data = await res.json();
+            renderLogs(data);
         }
 
         async function loadLogs() {
             const res = await fetch('/api/logs');
             const data = await res.json();
+            renderLogs(data);
+        }
+
+        function renderLogs(data) {
             const grid = document.getElementById('logsGrid');
             grid.innerHTML = '';
 
             data.forEach(trip => {
                 const div = document.createElement('div');
                 div.className = 'log-card';
+                // Pass safe strings to onclick
+                const safeNotes = trip.notes.replace(/'/g, "\\'"); 
+                const safeCity = trip.city.replace(/'/g, "\\'");
+
                 div.innerHTML = `
                     <div class="log-header">
                         <strong>${trip.city}, ${trip.country}</strong>
@@ -118,13 +162,55 @@
                     </div>
                     <small>${trip.condition}</small>
                     <p class="notes">"${trip.notes}"</p>
-                    <button class="del-btn" onclick="deleteLog('${trip._id}')">Delete</button>
+                    <div class="card-actions">
+                        <button class="edit-btn" onclick="startEdit('${trip._id}', '${safeCity}', '${safeNotes}')">Edit</button>
+                        <button class="del-btn" onclick="deleteLog('${trip._id}')">Delete</button>
+                    </div>
                 `;
                 grid.appendChild(div);
             });
         }
 
+        function startEdit(id, city, notes) {
+            // Scroll to top
+            window.scrollTo(0, 0);
+            
+            // Show result box even if hidden
+            document.getElementById('result').classList.remove('hidden');
+            
+            // Populate fields
+            document.getElementById('resCity').innerText = `Editing: ${city}`;
+            document.getElementById('resTemp').innerText = '--'; // Hide temp during edit
+            document.getElementById('logNotes').value = notes;
+            document.getElementById('editId').value = id;
+
+            // Change Button State
+            document.getElementById('saveBtn').innerText = "Update Trip";
+            document.getElementById('saveBtn').style.backgroundColor = "#ffa726"; // Orange for edit
+            document.getElementById('cancelBtn').classList.remove('hidden');
+            document.getElementById('msg').innerText = "Edit Mode Active";
+        }
+
+        function cancelEdit() {
+            document.getElementById('editId').value = '';
+            document.getElementById('logNotes').value = '';
+            document.getElementById('saveBtn').innerText = "Log This Trip";
+            document.getElementById('saveBtn').style.backgroundColor = "#00bcd4"; // Back to blue
+            document.getElementById('cancelBtn').classList.add('hidden');
+            document.getElementById('msg').innerText = "";
+            
+            // If we weren't viewing a city, hide the box again
+            if(!currentData) {
+                document.getElementById('result').classList.add('hidden');
+            } else {
+                // Restore current search view
+                document.getElementById('resCity').innerText = `${currentData.name}, ${currentData.country}`;
+                document.getElementById('resTemp').innerText = `${currentData.temperature}°C`;
+            }
+        }
+
         async function deleteLog(id) {
+            if(!confirm("Are you sure?")) return;
             await fetch('/api/delete', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
