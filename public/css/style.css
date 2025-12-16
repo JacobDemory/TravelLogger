@@ -1,8 +1,8 @@
-/* Requirement: Google Font, Background Color, Color, Font Size */
+/* Requirements: Google Font, Background Color, Color, Font Size */
 body {
     font-family: 'Montserrat', sans-serif; /* Google Font */
-    background-color: #e0f7fa; /* Light Blue Background */
-    color: #2c3e50; /* Color */
+    background-color: #e0f7fa; /* Light Blue Background Color */
+    color: #2c3e50; /* Blue Color */
     margin: 0;
     padding: 20px;
     display: flex;

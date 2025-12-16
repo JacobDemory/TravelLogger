@@ -77,7 +77,7 @@ router.get('/logs/search', async (req, res) => {
 router.post('/update', async (req, res) => {
     try {
         const { id, notes } = req.body;
-        // We only allow updating notes to keep it simple, but you could update anything
+        // Only allow updating notes to keep it simple, but you could implement the ability to update anything in theory
         await Trip.findByIdAndUpdate(id, { notes: notes });
         res.json({ message: 'Trip updated!' });
     } catch (err) {

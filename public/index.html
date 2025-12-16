@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Traveler's Log</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet"> <!-- Google Font Requirement -->
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -57,7 +57,7 @@
 
     <script>
         let currentData = null;
-        let isCelsius = true; // State for units
+        let isCelsius = true;
 
         function getWeatherDescription(code) {
             const codes = {
@@ -68,7 +68,6 @@
             return codes[code] || 'Varied Weather';
         }
 
-        // --- UNIT CONVERSION LOGIC ---
         function toggleUnits() {
             isCelsius = !isCelsius;
             document.getElementById('unitBtn').innerText = isCelsius ? "Switch to °F" : "Switch to °C";
@@ -86,7 +85,6 @@
             const f = (celsius * 9/5) + 32;
             return `${f.toFixed(1)}°F`;
         }
-        // -----------------------------
 
         async function searchCity(event) {
             event.preventDefault(); 
@@ -171,12 +169,11 @@
             renderLogs(data);
         }
 
-        // Clear All Function
         async function clearAllLogs() {
             if(!confirm("Are you sure you want to delete your ENTIRE travel history? This cannot be undone.")) return;
             
             await fetch('/api/clear', { method: 'POST' });
-            loadLogs(); // Grid should be empty now
+            loadLogs();
         }
 
         function renderLogs(data) {
