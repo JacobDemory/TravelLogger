@@ -2,9 +2,10 @@ const mongoose = require('mongoose');
 
 const tripSchema = new mongoose.Schema({
 	city: String,
+	state: String,
 	country: String,
 	temperature: Number,
-	condition: String, // We'll store the weather code or description
+	condition: String,
 	notes: String,
 	date: { type: Date, default: Date.now }
 });

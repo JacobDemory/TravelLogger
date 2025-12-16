@@ -102,8 +102,11 @@
 
             cancelEdit();
             currentData = data;
+
+            // Check if state exists. If so, format as "City, State, Country"
+            const locationString = data.state ? `${data.name}, ${data.state}, ${data.country}` : `${data.name}, ${data.country}`;
             
-            document.getElementById('resCity').innerText = `${data.name}, ${data.country}`;
+            document.getElementById('resCity').innerText = locationString;
             document.getElementById('resDesc').innerText = getWeatherDescription(data.weathercode);
             updateDisplayTemp();
             
@@ -135,6 +138,7 @@
                 // Always save to DB in Celsius for consistency
                 const payload = {
                     city: currentData.name,
+                    state: currentData.state,
                     country: currentData.country,
                     temperature: currentData.temperature, 
                     condition: getWeatherDescription(currentData.weathercode),
@@ -167,7 +171,7 @@
             renderLogs(data);
         }
 
-        // NEW: Clear All Function
+        // Clear All Function
         async function clearAllLogs() {
             if(!confirm("Are you sure you want to delete your ENTIRE travel history? This cannot be undone.")) return;
             
@@ -189,16 +193,20 @@
                 div.className = 'log-card';
                 const safeNotes = trip.notes.replace(/'/g, "\\'"); 
                 const safeCity = trip.city.replace(/'/g, "\\'");
+                const safeState = trip.state ? trip.state.replace(/'/g, "\\'") : '';
+
+                // Format the display string
+                const displayLocation = trip.state ? `${trip.city}, ${trip.state}, ${trip.country}` : `${trip.city}, ${trip.country}`;
 
                 div.innerHTML = `
                     <div class="log-header">
-                        <strong>${trip.city}, ${trip.country}</strong>
+                        <strong>${displayLocation}</strong>
                         <span>${formatTemp(trip.temperature)}</span>
                     </div>
                     <small>${trip.condition}</small>
                     <p class="notes">"${trip.notes}"</p>
                     <div class="card-actions">
-                        <button class="edit-btn" onclick="startEdit('${trip._id}', '${safeCity}', '${safeNotes}')">Edit</button>
+                        <button class="edit-btn" onclick="startEdit('${trip._id}', '${displayLocation}', '${safeNotes}')">Edit</button>
                         <button class="del-btn" onclick="deleteLog('${trip._id}')">Delete</button>
                     </div>
                 `;

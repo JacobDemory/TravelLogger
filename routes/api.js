@@ -13,7 +13,7 @@ router.get('/weather/:city', async (req, res) => {
 
         if (!geoRes.data.results) return res.status(404).json({ error: 'City not found' });
 
-        const { latitude, longitude, name, country } = geoRes.data.results[0];
+        const { latitude, longitude, name, country, admin1 } = geoRes.data.results[0];
 
         // Step B: Weather
         const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`;
@@ -22,6 +22,7 @@ router.get('/weather/:city', async (req, res) => {
 
         const data = {
             name: name,
+            state: admin1 || '',
             country: country,
             temperature: currentWeather.temperature,
             windspeed: currentWeather.windspeed,
@@ -36,8 +37,8 @@ router.get('/weather/:city', async (req, res) => {
 // 2. Create (Log a Trip)
 router.post('/log', async (req, res) => {
     try {
-        const { city, country, temperature, condition, notes } = req.body;
-        const newTrip = new Trip({ city, country, temperature, condition, notes });
+        const { city, state, country, temperature, condition, notes } = req.body;
+        const newTrip = new Trip({ city, state, country, temperature, condition, notes });
         await newTrip.save();
         res.json({ message: 'Trip logged successfully!' });
     } catch (error) {
